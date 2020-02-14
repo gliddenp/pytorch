@@ -163,22 +163,30 @@ void retain_grad(const Tensor & self) {
   }
   c10::weak_intrusive_ptr<TensorImpl> weak_self(self.getIntrusivePtr());
 
-  self.register_hook([&](Tensor grad){
-    if (weak_self.expired()) {
-      return;
-    } else {
-      auto var = weak_self.lock();
-      if (!var->grad().defined()) {
-        if (grad.is_sparse()) {
-          var->grad() = grad.clone();
-        } else {
-          var->grad() = grad.clone(at::MemoryFormat::Contiguous);
-        }
-      } else {
-        var->grad() = var->grad() + grad;
-      }
-    }
+  std::function<void(Tensor)> retain_grad_hook([&weak_self](Tensor grad) {
+    std::cout << "retain_grad_hook is called" << std::endl;
+    // if (weak_self.expired()) {
+    //   std::cout << "weak_self is expired" << std::endl;
+    //   return;
+    // } else {
+    //   std::cout << "weak_self is not expired" << std::endl;
+    //   auto var = weak_self.lock();
+    //   std::cout << var->sizes() << std::endl;
+    //   TORCH_INTERNAL_ASSERT(var->autograd_meta());
+    //   TORCH_INTERNAL_ASSERT(var->requires_grad());
+    //   if (!var->grad().defined()) {
+    //     if (grad.is_sparse()) {
+    //       var->grad() = grad.clone();
+    //     } else {
+    //       var->grad() = grad.clone(at::MemoryFormat::Contiguous);
+    //     }
+    //   } else {
+    //     var->grad() = var->grad() + grad;
+    //   }
+    // }
   });
+
+  self.register_hook(retain_grad_hook);
   impl::get_autograd_meta(self)->retains_grad_ = true;
 }
 
